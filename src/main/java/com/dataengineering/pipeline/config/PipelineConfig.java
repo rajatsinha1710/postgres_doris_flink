@@ -3,17 +3,17 @@ package com.dataengineering.pipeline.config;
 import java.util.Properties;
 
 /**
- * Configuration management for the Flink pipeline.
- * Centralizes all configuration parameters for Kafka, PostgreSQL, and Doris.
+ * Configuration management for the streamlined CDC-to-Doris pipeline.
+ * Centralizes all configuration parameters for Kafka and Doris JDBC.
  */
 public class PipelineConfig {
     
     // Kafka Configuration
     public static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:29092";
-    public static final String KAFKA_GROUP_ID = "flink-postgres-doris-pipeline";
+    public static final String KAFKA_GROUP_ID = "flink-cdc-doris-pipeline";
     public static final String KAFKA_AUTO_OFFSET_RESET = "earliest";
     
-    // Kafka Topics - CDC events from PostgreSQL
+    // Kafka Topics - CDC events from source tables
     public static final String[] KAFKA_TOPICS = {
         "pgserver1.public.clients_to_exclude",
         "pgserver1.public.job_activity", 
@@ -21,19 +21,40 @@ public class PipelineConfig {
         "pgserver1.public.standard_revenue"
     };
     
-    // PostgreSQL Configuration
-    public static final String POSTGRES_URL = "jdbc:postgresql://localhost:5432/postgres";
-    public static final String POSTGRES_USERNAME = "rajatsinha";
-    public static final String POSTGRES_PASSWORD = "";
-    public static final int POSTGRES_MAX_CONNECTIONS = 10;
-    
-    // Doris Configuration
-    public static final String DORIS_STREAM_LOAD_URL = "http://localhost:8030/api/job_analytics/merged_job_data/_stream_load";
+    // Doris JDBC Configuration
+    public static final String DORIS_JDBC_URL = "jdbc:mysql://127.0.0.1:9030/job_analytics";
     public static final String DORIS_USERNAME = "root";
     public static final String DORIS_PASSWORD = "";
-    public static final int DORIS_BATCH_SIZE = 50; // Reduced batch size for better error handling
-    public static final int DORIS_MAX_RETRIES = 5; // Increased retries
-    public static final long DORIS_RETRY_DELAY_MS = 2000; // Increased delay
+    public static final String DORIS_DATABASE = "job_analytics";
+    public static final String DORIS_TABLE = "merged_job_data";
+    
+    // Doris Table Schema Documentation
+    /*
+     * Doris Table: merged_job_data
+     * Primary Key: activity_id (for upsert operations)
+     * 
+     * Columns:
+     * - activity_id (VARCHAR) - Primary key from job_activity table
+     * - job_id (VARCHAR) - From jobs table
+     * - jobdiva_no (VARCHAR) - From job_activity table
+     * - candidate (VARCHAR) - From job_activity table (candidate_name)
+     * - company_name (VARCHAR) - From job_activity or clients_to_exclude table
+     * - assignment_start_date (DATETIME) - From job_activity table
+     * - assignment_end_date (DATETIME) - From job_activity table
+     * - job_title (VARCHAR) - From jobs table
+     * - location (VARCHAR) - From jobs table
+     * - excluded_reason (VARCHAR) - From clients_to_exclude table
+     * - sr_assignment_start (DATETIME) - From standard_revenue table
+     * - sr_assignment_end (DATETIME) - From standard_revenue table
+     * - standard_revenue_report_month (VARCHAR) - From standard_revenue table
+     * - clienterpid (VARCHAR) - From standard_revenue table
+     * - bcworkerid (VARCHAR) - From job_activity or standard_revenue table
+     * - adjustedstbillrate (DECIMAL) - From standard_revenue table
+     * - adjustedstpayrate (DECIMAL) - From standard_revenue table
+     * - adjgphrst (DECIMAL) - From standard_revenue table
+     * - adjrevenue (DECIMAL) - From standard_revenue table
+     * - stbillrate (DECIMAL) - From standard_revenue table
+     */
     
     // Flink Configuration
     public static final int FLINK_PARALLELISM = 4;
@@ -54,14 +75,15 @@ public class PipelineConfig {
     }
     
     /**
-     * Creates PostgreSQL connection properties.
+     * Creates Doris JDBC connection properties.
      */
-    public static Properties getPostgresProperties() {
+    public static Properties getDorisProperties() {
         Properties props = new Properties();
-        props.setProperty("user", POSTGRES_USERNAME);
-        props.setProperty("password", POSTGRES_PASSWORD);
-        props.setProperty("ssl", "false");
-        props.setProperty("maxConnections", String.valueOf(POSTGRES_MAX_CONNECTIONS));
+        props.setProperty("user", DORIS_USERNAME);
+        props.setProperty("password", DORIS_PASSWORD);
+        props.setProperty("useSSL", "false");
+        props.setProperty("allowPublicKeyRetrieval", "true");
+        props.setProperty("serverTimezone", "UTC");
         return props;
     }
 }
