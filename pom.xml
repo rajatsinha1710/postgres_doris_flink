@@ -46,12 +46,7 @@
             <version>3.0.1-1.18</version>
         </dependency>
 
-        <!-- PostgreSQL JDBC Driver -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>${postgresql.version}</version>
-        </dependency>
+        <!-- Removed PostgreSQL JDBC Driver - no longer needed -->
         
         <!-- MySQL JDBC Driver (for Doris JDBC connection) -->
         <dependency>
@@ -60,12 +55,7 @@
             <version>8.0.33</version>
         </dependency>
 
-        <!-- HikariCP Connection Pool -->
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>5.0.1</version>
-        </dependency>
+        <!-- Removed HikariCP Connection Pool - using simple JDBC connections -->
 
         <!-- JSON Processing -->
         <dependency>
@@ -80,12 +70,7 @@
             <version>${jackson.version}</version>
         </dependency>
 
-        <!-- HTTP Client -->
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.5.14</version>
-        </dependency>
+        <!-- Removed HTTP Client - using JDBC instead of Stream Load API -->
 
         <!-- Logging -->
         <dependency>

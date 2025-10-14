@@ -32,7 +32,7 @@ public class KafkaConsumerSetup {
             .setBootstrapServers(PipelineConfig.KAFKA_BOOTSTRAP_SERVERS)
             .setTopics(PipelineConfig.KAFKA_TOPICS)
             .setGroupId(PipelineConfig.KAFKA_GROUP_ID)
-            .setStartingOffsets(OffsetsInitializer.latest())
+            .setStartingOffsets(OffsetsInitializer.earliest())
             .setValueOnlyDeserializer(new SimpleStringSchema())
             .build();
         
@@ -63,7 +63,7 @@ public class KafkaConsumerSetup {
                 .setBootstrapServers(PipelineConfig.KAFKA_BOOTSTRAP_SERVERS)
                 .setTopics(topic)
                 .setGroupId(PipelineConfig.KAFKA_GROUP_ID)
-                .setStartingOffsets(OffsetsInitializer.latest())
+                .setStartingOffsets(OffsetsInitializer.earliest())
                 .setValueOnlyDeserializer(new SimpleStringSchema())
                 .build();
             

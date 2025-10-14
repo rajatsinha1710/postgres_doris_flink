@@ -1,133 +1,158 @@
-# Flink PostgreSQL Doris Pipeline
+# CDC-to-Doris Pipeline
 
-A real-time data pipeline built with Apache Flink that integrates PostgreSQL, Kafka, and Apache Doris for job analytics data processing.
+Streamlined real-time pipeline for Change Data Capture (CDC) events from Kafka directly to Doris via JDBC.
 
 ## Overview
 
-This pipeline consumes Change Data Capture (CDC) events from Kafka topics, extracts primary key IDs, queries PostgreSQL for merged records, and loads the results into Apache Doris for analytics.
+This pipeline consumes CDC events from Kafka topics and performs direct upserts to Doris using JDBC. No intermediate processing, merging, or enrichment - each CDC event is mapped to relevant columns and upserted directly to the Doris table.
 
 ## Architecture
 
 ```
-Kafka Topics → Flink Job → PostgreSQL Query → Doris Stream Load
-     ↓              ↓              ↓              ↓
-CDC Events → ID Extraction → Merged Results → Analytics DB
+Kafka CDC Events → CDC Processor → Doris JDBC Sink → Doris Table
 ```
 
-## Features
-
-- **Multi-topic Kafka consumption** from PostgreSQL CDC events
-- **Intelligent ID extraction** from various CDC formats (Debezium, Maxwell)
-- **Complex PostgreSQL merge queries** with JDBC prepared statements
-- **Batch processing** with configurable batch sizes
-- **HTTP Stream Load** to Apache Doris with redirect handling
-- **Retry logic** with exponential backoff
-- **Fault tolerance** with Flink checkpointing
-- **Comprehensive logging** and monitoring
-
-## Components
-
-### 1. Data Models
-- `MergedResult`: Represents the merged data from PostgreSQL query
-
-### 2. Configuration
-- `PipelineConfig`: Centralized configuration management
-
-### 3. Kafka Integration
-- `KafkaConsumerSetup`: Multi-topic Kafka consumer configuration
-
-### 4. Data Processing
-- `IdExtractor`: Extracts primary key IDs from CDC events
-- `PostgresMergeQueryProcessor`: Executes PostgreSQL merge queries
-
-### 5. Data Sink
-- `DorisSink`: Batched HTTP Stream Load to Apache Doris
-
-### 6. Utilities
-- `PipelineUtils`: Common utility functions for retry logic and validation
+- **Kafka Consumer**: Consumes CDC events from multiple topics
+- **CDC Processor**: Maps CDC events to Doris table columns based on source table
+- **Doris JDBC Sink**: Performs direct upserts using `INSERT ... ON DUPLICATE KEY UPDATE`
 
 ## Configuration
 
 ### Kafka Configuration
 ```java
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+KAFKA_BOOTSTRAP_SERVERS = "localhost:29092"
+KAFKA_GROUP_ID = "flink-cdc-doris-pipeline"
 KAFKA_TOPICS = [
-    "enhanced_job_server_v2.public.jobs",
-    "enhanced_job_server_v2.public.job_activity",
-    "enhanced_job_server_v2.public.clients_to_exclude",
-    "enhanced_job_server_v2.public.standard_revenue"
+    "pgserver1.public.clients_to_exclude",
+    "pgserver1.public.job_activity", 
+    "pgserver1.public.jobs",
+    "pgserver1.public.standard_revenue"
 ]
-```
-
-### PostgreSQL Configuration
-```java
-POSTGRES_URL = "jdbc:postgresql://localhost:5432/enhanced_job_server_v2"
-POSTGRES_USERNAME = "postgres"
-POSTGRES_PASSWORD = "password"
 ```
 
 ### Doris Configuration
 ```java
-DORIS_STREAM_LOAD_URL = "http://localhost:8030/api/job_analytics/merged_job_data/_stream_load"
-DORIS_BATCH_SIZE = 100
-DORIS_MAX_RETRIES = 3
+DORIS_JDBC_URL = "jdbc:mysql://127.0.0.1:9030/job_analytics"
+DORIS_USERNAME = "root"
+DORIS_PASSWORD = ""
+DORIS_DATABASE = "job_analytics"
+DORIS_TABLE = "merged_job_data"
 ```
 
-## Building and Running
+## Doris Table Schema
 
-### Prerequisites
-- Java 11+
-- Maven 3.6+
-- Apache Flink 1.18.0
-- PostgreSQL database
-- Apache Kafka
-- Apache Doris
+The target table `merged_job_data` should be created with the following schema:
 
-### Build
-```bash
-mvn clean package
+```sql
+CREATE TABLE merged_job_data (
+    activity_id VARCHAR(255) NOT NULL,
+    job_id VARCHAR(255),
+    jobdiva_no VARCHAR(255),
+    candidate VARCHAR(255),
+    company_name VARCHAR(255),
+    assignment_start_date DATETIME,
+    assignment_end_date DATETIME,
+    job_title VARCHAR(255),
+    location VARCHAR(255),
+    excluded_reason VARCHAR(255),
+    sr_assignment_start DATETIME,
+    sr_assignment_end DATETIME,
+    standard_revenue_report_month VARCHAR(255),
+    clienterpid VARCHAR(255),
+    bcworkerid VARCHAR(255),
+    adjustedstbillrate DECIMAL(10,2),
+    adjustedstpayrate DECIMAL(10,2),
+    adjgphrst DECIMAL(10,2),
+    adjrevenue DECIMAL(10,2),
+    stbillrate DECIMAL(10,2),
+    PRIMARY KEY (activity_id)
+) ENGINE=OLAP
+DUPLICATE KEY(activity_id)
+DISTRIBUTED BY HASH(activity_id) BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1"
+);
 ```
 
-### Run
-```bash
-java -jar target/flink-postgres-doris-pipeline-1.0.0.jar
-```
+## Column Mapping
 
-## Data Flow
+The pipeline maps CDC events to Doris columns based on the source table:
 
-1. **Kafka Consumption**: Consumes CDC events from multiple PostgreSQL tables
-2. **ID Extraction**: Parses CDC events and extracts relevant primary key IDs
-3. **PostgreSQL Query**: Executes complex merge query using extracted IDs
-4. **Data Transformation**: Maps ResultSet to MergedResult objects
-5. **Batch Processing**: Groups records into configurable batches
-6. **Doris Loading**: Sends batches to Doris via HTTP Stream Load API
+### job_activity table
+- `activity_id` → `activity_id` (primary key)
+- `job_id` → `job_id`
+- `jobdiva_no` → `jobdiva_no`
+- `candidate_name` → `candidate`
+- `company_name` → `company_name`
+- `assignment_start_date` → `assignment_start_date`
+- `assignment_end_date` → `assignment_end_date`
+- `bcworkerid` → `bcworkerid`
 
-## Error Handling
+### jobs table
+- `job_id` → `job_id`
+- `job_title` → `job_title`
+- `location` → `location`
 
-- **Retry Logic**: Exponential backoff for failed operations
-- **Fault Tolerance**: Flink checkpointing for job recovery
-- **Logging**: Comprehensive error logging and monitoring
-- **Graceful Degradation**: Continues processing despite individual failures
+### clients_to_exclude table
+- `exclusion_reason` → `excluded_reason`
+- `client_id` → `company_name`
+
+### standard_revenue table
+- `standard_revenue_report_month` → `standard_revenue_report_month`
+- `clienterpid` → `clienterpid`
+- `bcworkerid` → `bcworkerid`
+- `adjusted_st_bill_rate` → `adjustedstbillrate`
+- `adjusted_st_pay_rate` → `adjustedstpayrate`
+- `adj_gph_rst` → `adjgphrst`
+- `adj_revenue` → `adjrevenue`
+- `st_bill_rate` → `stbillrate`
+- `assignment_start_date` → `sr_assignment_start`
+- `assignment_end_date` → `sr_assignment_end`
+
+## Running the Pipeline
+
+1. **Build the project**:
+   ```bash
+   mvn clean package
+   ```
+
+2. **Start Flink cluster** (if not already running)
+
+3. **Submit the job**:
+   ```bash
+   flink run target/flink-postgres-doris-pipeline-1.0.0.jar
+   ```
+
+## Key Features
+
+- **Direct CDC Processing**: No intermediate storage or complex merging logic
+- **Table-Specific Mapping**: Only relevant columns are upserted based on source table
+- **JDBC Upserts**: Uses `INSERT ... ON DUPLICATE KEY UPDATE` for reliable upserts
+- **Error Handling**: Basic error handling with logging, no complex retry frameworks
+- **Minimal Dependencies**: Removed PostgreSQL, HikariCP, and HTTP client dependencies
+- **Streamlined Architecture**: Simple, direct pipeline with minimal abstractions
 
 ## Monitoring
 
-The pipeline provides detailed logging for:
-- Kafka message consumption
-- ID extraction success/failure rates
-- PostgreSQL query performance
-- Doris loading statistics
-- Error conditions and retries
+The pipeline provides basic logging for:
+- CDC event processing
+- Column mapping
+- Upsert operations
+- Error conditions
 
-## Performance Tuning
+Check Flink logs for pipeline status and any error conditions.
 
-- **Parallelism**: Configurable Flink parallelism
-- **Batch Sizes**: Adjustable Doris batch sizes
-- **Checkpointing**: Configurable checkpoint intervals
-- **Connection Pooling**: PostgreSQL connection management
+## Prerequisites
 
-## Security Considerations
+- Java 11+
+- Maven 3.6+
+- Apache Flink 1.18.0
+- Apache Kafka
+- Apache Doris
 
-- Database credentials should be externalized
-- Kafka authentication can be added
-- Doris authentication via HTTP Basic Auth
-- Network security for database connections
+## Changes from Original Pipeline
+
+- **Removed**: PostgreSQL integration, complex merge queries, batching logic
+- **Simplified**: Direct CDC-to-Doris mapping with JDBC upserts
+- **Streamlined**: Minimal dependencies and straightforward architecture
+- **Focused**: Single responsibility - CDC event processing and direct upserts
