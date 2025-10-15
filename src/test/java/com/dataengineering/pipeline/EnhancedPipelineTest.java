@@ -1,6 +1,9 @@
 package com.dataengineering.pipeline;
 
+import com.dataengineering.pipeline.config.PipelineConfig;
 import com.dataengineering.pipeline.model.CdcEvent;
+import com.dataengineering.pipeline.test.TestDataGenerator;
+import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -9,8 +12,17 @@ import java.util.Map;
 /**
  * Test class for validating the enhanced pipeline functionality.
  * Tests selective column mapping and source table detection.
+ * Updated to work with the new configuration system.
  */
 public class EnhancedPipelineTest {
+    
+    @Before
+    public void setUp() {
+        // Print configuration for debugging
+        System.out.println("=== Test Configuration ===");
+        PipelineConfig.printConfiguration();
+        System.out.println("==========================");
+    }
     
     @Test
     public void testJobActivityMapping() {
@@ -198,6 +210,56 @@ public class EnhancedPipelineTest {
         
         Map<String, Object> dorisColumns = event.getDorisColumns();
         assertTrue("Should return empty map for null after data", dorisColumns.isEmpty());
+    }
+    
+    @Test
+    public void testConfigurationLoading() {
+        // Test that configuration is loaded correctly
+        assertNotNull("Kafka bootstrap servers should be configured", PipelineConfig.KAFKA_BOOTSTRAP_SERVERS);
+        assertNotNull("Kafka topics should be configured", PipelineConfig.KAFKA_TOPICS);
+        assertNotNull("Doris JDBC URL should be configured", PipelineConfig.DORIS_JDBC_URL);
+        assertNotNull("Doris table should be configured", PipelineConfig.DORIS_TABLE);
+        
+        // Verify topics array is not empty
+        assertTrue("Kafka topics should not be empty", PipelineConfig.KAFKA_TOPICS.length > 0);
+        
+        // Verify parallelism is positive
+        assertTrue("Flink parallelism should be positive", PipelineConfig.FLINK_PARALLELISM > 0);
+    }
+    
+    @Test
+    public void testTestDataGeneratorIntegration() {
+        // Test that TestDataGenerator works with the pipeline
+        String testEvent = TestDataGenerator.generateJobActivityCdcEvent("test_generator_1", "c");
+        assertNotNull("Test data generator should create valid JSON", testEvent);
+        
+        CdcEvent event = CdcEvent.fromJson(testEvent);
+        assertNotNull("Generated event should be parseable", event);
+        
+        Map<String, Object> dorisColumns = event.getDorisColumns();
+        assertNotNull("Generated event should produce Doris columns", dorisColumns);
+        assertFalse("Generated event should not be empty", dorisColumns.isEmpty());
+        
+        // Verify source table metadata
+        assertEquals("job_activity", dorisColumns.get("__source_table__"));
+        assertEquals("test_generator_1", dorisColumns.get("activity_id"));
+    }
+    
+    @Test
+    public void testBatchDataGeneration() {
+        // Test batch data generation
+        java.util.List<String> batchEvents = TestDataGenerator.generateBatchTestEvents(5);
+        assertNotNull("Batch events should be generated", batchEvents);
+        assertTrue("Should generate multiple events", batchEvents.size() > 0);
+        
+        // Verify each event can be processed
+        for (String eventJson : batchEvents) {
+            CdcEvent event = CdcEvent.fromJson(eventJson);
+            assertNotNull("Each batch event should be parseable", event);
+            
+            Map<String, Object> dorisColumns = event.getDorisColumns();
+            assertNotNull("Each batch event should produce Doris columns", dorisColumns);
+        }
     }
 }
 

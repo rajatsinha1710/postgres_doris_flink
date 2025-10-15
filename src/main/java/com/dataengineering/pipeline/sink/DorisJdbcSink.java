@@ -23,12 +23,11 @@ public class DorisJdbcSink extends RichSinkFunction<Map<String, Object>> {
     private Connection connection;
     private PreparedStatement upsertStatement;
     
-    // Doris JDBC connection details
-    private static final String DORIS_JDBC_URL = "jdbc:mysql://127.0.0.1:9030/job_analytics";
+    // Doris JDBC connection details - now configurable via PipelineConfig
     
     // Upsert SQL with ON DUPLICATE KEY UPDATE for all columns
     private static final String UPSERT_SQL = 
-        "INSERT INTO merged_job_data (" +
+        "INSERT INTO " + PipelineConfig.DORIS_TABLE + " (" +
         "activity_id, job_id, jobdiva_no, candidate, company_name, " +
         "assignment_start_date, assignment_end_date, job_title, location, excluded_reason, " +
         "sr_assignment_start, sr_assignment_end, standard_revenue_report_month, " +
@@ -66,7 +65,7 @@ public class DorisJdbcSink extends RichSinkFunction<Map<String, Object>> {
             Class.forName("com.mysql.cj.jdbc.Driver");
             
             connection = DriverManager.getConnection(
-                DORIS_JDBC_URL, 
+                PipelineConfig.DORIS_JDBC_URL, 
                 PipelineConfig.DORIS_USERNAME, 
                 PipelineConfig.DORIS_PASSWORD
             );
