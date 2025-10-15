@@ -100,13 +100,7 @@ public class JobAnalyticsPipeline {
      * Utility method to add custom logging configuration.
      */
     private static void configureLogging() {
-        // Log pipeline configuration
-        logger.info("CDC-to-Doris Pipeline Configuration:");
-        logger.info("  Kafka Bootstrap Servers: {}", PipelineConfig.KAFKA_BOOTSTRAP_SERVERS);
-        logger.info("  Kafka Topics: {}", String.join(", ", PipelineConfig.KAFKA_TOPICS));
-        logger.info("  Doris JDBC URL: {}", PipelineConfig.DORIS_JDBC_URL);
-        logger.info("  Doris Database: {}", PipelineConfig.DORIS_DATABASE);
-        logger.info("  Doris Table: {}", PipelineConfig.DORIS_TABLE);
-        logger.info("  Flink Parallelism: {}", PipelineConfig.FLINK_PARALLELISM);
+        // Print configuration using the new method
+        PipelineConfig.printConfiguration();
     }
 }

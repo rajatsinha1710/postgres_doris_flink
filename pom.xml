@@ -85,6 +85,13 @@
             <version>${logback.version}</version>
         </dependency>
 
+        <!-- Properties Support -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>5.3.23</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.apache.flink</groupId>
